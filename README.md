@@ -21,8 +21,8 @@ Before you begin, ensure that you have the following installed:
    First, clone this repository to your local machine:
 
    ```bash
-   git clone https://github.com/yourusername/text_editor.git
-   cd text_editor
+   git clone https://github.com/Amanbig/Text-Editor-Celebrare_ass-.git
+   cd Text-Editor-Celebrare_ass-
    ```
 
 2. **Install dependencies**
@@ -36,3 +36,15 @@ Before you begin, ensure that you have the following installed:
    ```bash
    flutter run
     ```
+   
+### Features
+- Add draggable text with customizable font styles (bold, italic, underline).
+- Choose font color using a color picker.
+- Adjust font size via a slider.
+- Undo and redo text changes using the respective buttons.
+
+### Troubleshooting
+If you run into any issues, ensure that:
+- Your Flutter installation is up to date by running flutter upgrade.
+- The dependencies are properly installed with flutter pub get.
+- The project is running on a supported device/emulator.
