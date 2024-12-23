@@ -15,6 +15,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isUnderline = false;
   double _fontSize = 16.0;
   Color _fontColor = Colors.black;
+  Color _backgroundColor = Colors.white;
 
   final List<DraggableText> _draggableTexts = [];
   final List<List<DraggableText>> _undoStack = [];
@@ -44,7 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text("Cancel"),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _addDraggableText(textController.text.isNotEmpty
@@ -60,7 +61,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _addDraggableText(String text) {
-    _saveStateToUndoStack();
     setState(() {
       final newText = DraggableText(
         key: UniqueKey(),
@@ -73,6 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
         isUnderline: _isUnderline,
         onSelected: _handleTextSelection,
         updatePosition: _updateTextPosition,
+        isSelected: false,
       );
       _draggableTexts.add(newText);
       _textCounter++;
@@ -81,15 +82,19 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _handleTextSelection(DraggableText text) {
+    _saveStateToUndoStack();
     setState(() {
       _selectedText = text;
-      // Update the controls to match selected text
       _fontFamily = text.fontFamily;
       _fontColor = text.fontColor;
       _fontSize = text.fontSize;
       _isBold = text.isBold;
       _isItalic = text.isItalic;
       _isUnderline = text.isUnderline;
+
+      for (var draggableText in _draggableTexts) {
+        draggableText.isSelected = draggableText == text;
+      }
     });
   }
 
@@ -151,6 +156,42 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _changeBackgroundColor() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Choose Background Color"),
+          content: SingleChildScrollView(
+            child: BlockPicker(
+              pickerColor: _backgroundColor,
+              onColorChanged: (color) {
+                setState(() {
+                  _backgroundColor = color;
+                });
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteSelectedText() {
+    if (_selectedText != null) {
+      setState(() {
+        _draggableTexts.remove(_selectedText);
+        _selectedText = null;
+      });
+    }
+  }
+
   void _saveStateToUndoStack() {
     _undoStack.add(List.from(_draggableTexts));
     _redoStack.clear();
@@ -179,139 +220,165 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Celebrare',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: _undoAction,
-                      icon: const Icon(Icons.undo),
-                    ),
-                    IconButton(
-                      onPressed: _redoAction,
-                      icon: const Icon(Icons.redo),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Celebrare',style: TextStyle(
+          color: Colors.white,
+        ),),
+        actions: [
+          IconButton(
+            onPressed: _undoAction,
+            icon: const Icon(Icons.undo,color: Colors.white,),
           ),
-          Expanded(
-            child: Stack(
-              children: [
-                Container(color: Colors.grey),
-                ..._draggableTexts,
-              ],
-            ),
+          IconButton(
+            onPressed: _redoAction,
+            icon: const Icon(Icons.redo,color: Colors.white,),
           ),
-          Row(
-            children: [
-              const Text("Font Size:"),
-              Expanded(
-                child: Slider(
-                  value: _fontSize,
-                  min: 8.0,
-                  max: 48.0,
-                  divisions: 20,
-                  label: _fontSize.toStringAsFixed(1),
-                  onChanged: (newValue) {
-                    setState(() {
-                      _fontSize = newValue;
-                      _updateSelectedTextStyle();
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-          TextButton(
-            onPressed: _addText,
-            child: const Text("Add Text"),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              DropdownButton<String>(
-                value: _fontFamily,
-                items: const [
-                  DropdownMenuItem(value: 'Arial', child: Text('Arial')),
-                  DropdownMenuItem(value: 'Times New Roman', child: Text('Times New Roman')),
-                  DropdownMenuItem(value: 'Courier New', child: Text('Courier New')),
-                  DropdownMenuItem(value: 'Verdana', child: Text('Verdana')),
-                  DropdownMenuItem(value: 'Georgia', child: Text('Georgia')),
-                  DropdownMenuItem(value: 'Comic Sans MS', child: Text('Comic Sans MS')),
-                  DropdownMenuItem(value: 'Trebuchet MS', child: Text('Trebuchet MS')),
-                  DropdownMenuItem(value: 'Impact', child: Text('Impact')),
-                ],
-                onChanged: (newValue) {
-                  setState(() {
-                    _fontFamily = newValue!;
-                    _updateSelectedTextStyle();
-                  });
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.format_bold,
-                    color: _isBold ? Colors.blue : Colors.black),
-                onPressed: () {
-                  setState(() {
-                    _isBold = !_isBold;
-                    _updateSelectedTextStyle();
-                  });
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.format_italic,
-                    color: _isItalic ? Colors.blue : Colors.black),
-                onPressed: () {
-                  setState(() {
-                    _isItalic = !_isItalic;
-                    _updateSelectedTextStyle();
-                  });
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.format_underline,
-                    color: _isUnderline ? Colors.blue : Colors.black),
-                onPressed: () {
-                  setState(() {
-                    _isUnderline = !_isUnderline;
-                    _updateSelectedTextStyle();
-                  });
-                },
-              ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                "Font Color:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              TextButton(
-                onPressed: _changeFontColor,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  color: _fontColor,
-                ),
-              ),
-            ],
+          IconButton(
+            onPressed: _deleteSelectedText,
+            icon: const Icon(Icons.delete,color: Colors.white,),
           ),
         ],
+        backgroundColor: Colors.black,
       ),
-    ));
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(color: _backgroundColor),
+                  ..._draggableTexts,
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Text("Font Size:",style: TextStyle(color: Colors.white,),),
+                      Expanded(
+                        child: Slider(
+                          value: _fontSize,
+                          min: 8.0,
+                          max: 48.0,
+                          divisions: 20,
+                          label: _fontSize.toStringAsFixed(1),
+                          onChanged: (newValue) {
+                            setState(() {
+                              _fontSize = newValue;
+                              _updateSelectedTextStyle();
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      DropdownButton<String>(
+                        value: _fontFamily,
+                        dropdownColor: Colors.black,
+                        items: const [
+                          DropdownMenuItem(value: 'Arial', child: Text('Arial',style: TextStyle(color: Colors.white,),)),
+                          DropdownMenuItem(value: 'Times New Roman', child: Text('Times New Roman',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Courier New', child: Text('Courier New',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Verdana', child: Text('Verdana',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Georgia', child: Text('Georgia',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Comic Sans MS', child: Text('Comic Sans MS',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Trebuchet MS', child: Text('Trebuchet MS',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Impact', child: Text('Impact',style: TextStyle(color: Colors.white))),
+                        ],
+                        style: const TextStyle(color: Colors.white),
+                        onChanged: (newValue) {
+                          setState(() {
+                            _fontFamily = newValue!;
+                            _updateSelectedTextStyle();
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.format_bold,
+                            color: _isBold ? Colors.blue : Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            _isBold = !_isBold;
+                            _updateSelectedTextStyle();
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.format_italic,
+                            color: _isItalic ? Colors.blue : Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            _isItalic = !_isItalic;
+                            _updateSelectedTextStyle();
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.format_underline,
+                            color: _isUnderline ? Colors.blue : Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            _isUnderline = !_isUnderline;
+                            _updateSelectedTextStyle();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Font Color:",
+                        style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white,),
+                      ),
+                      TextButton(
+                        onPressed: _changeFontColor,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: _fontColor,
+                          border: Border.all(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        "Background Color:",
+                        style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white,),
+                      ),
+                      TextButton(
+                        onPressed: _changeBackgroundColor,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: _backgroundColor,
+                          border: Border.all(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                    onPressed: _addText,
+                    child: const Text("Add Text",style: TextStyle(color: Colors.white,),),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -326,6 +393,7 @@ class DraggableText extends StatefulWidget {
   Offset position;
   final Function(DraggableText) onSelected;
   final Function(DraggableText, Offset) updatePosition;
+  bool isSelected;
 
   DraggableText({
     super.key,
@@ -339,6 +407,7 @@ class DraggableText extends StatefulWidget {
     required this.onSelected,
     required this.updatePosition,
     this.position = const Offset(50, 50),
+    this.isSelected = false,
   });
 
   DraggableText copyWith({
@@ -350,6 +419,7 @@ class DraggableText extends StatefulWidget {
     bool? isItalic,
     bool? isUnderline,
     Offset? position,
+    bool? isSelected,
   }) {
     return DraggableText(
       key: key,
@@ -363,6 +433,7 @@ class DraggableText extends StatefulWidget {
       position: position ?? this.position,
       onSelected: onSelected,
       updatePosition: updatePosition,
+      isSelected: isSelected ?? this.isSelected,
     );
   }
 
@@ -387,19 +458,23 @@ class _DraggableTextState extends State<DraggableText> {
           ),
           childWhenDragging: Container(),
           onDragStarted: () {
-            // Store the initial position when the drag starts
             initialPosition = widget.position;
           },
           onDraggableCanceled: (velocity, offset) {
-            // Update the final position after the drag ends
             setState(() {
-              widget.position = initialPosition!;
+              widget.position = Offset(
+                offset.dx,
+                offset.dy - AppBar().preferredSize.height - MediaQuery.of(context).padding.top,
+              );
+              widget.updatePosition(widget, widget.position);
             });
           },
           onDragEnd: (details) {
-            // Update the final position after the drag ends
             setState(() {
-              widget.position = details.offset;
+              widget.position = Offset(
+                details.offset.dx,
+                details.offset.dy - AppBar().preferredSize.height - MediaQuery.of(context).padding.top,
+              );
               widget.updatePosition(widget, widget.position);
             });
           },
@@ -410,15 +485,29 @@ class _DraggableTextState extends State<DraggableText> {
   }
 
   Widget _buildText() {
-    return Text(
-      widget.text,
-      style: TextStyle(
-        fontFamily: widget.fontFamily,
-        fontWeight: widget.isBold ? FontWeight.bold : FontWeight.normal,
-        fontStyle: widget.isItalic ? FontStyle.italic : FontStyle.normal,
-        decoration: widget.isUnderline ? TextDecoration.underline : null,
-        fontSize: widget.fontSize,
-        color: widget.fontColor,
+    return Container(
+      decoration: widget.isSelected
+          ? BoxDecoration(
+              border: Border.all(color: Colors.blueAccent, width: 2),
+              borderRadius: BorderRadius.circular(4),
+            )
+          : null,
+      padding: const EdgeInsets.all(4.0),
+      child:GestureDetector(
+        onTap: () {
+          widget.onSelected(widget);
+          },
+        child: Text(
+          widget.text,
+          style: TextStyle(
+            fontFamily: widget.fontFamily,
+            fontWeight: widget.isBold ? FontWeight.bold : FontWeight.normal,
+            fontStyle: widget.isItalic ? FontStyle.italic : FontStyle.normal,
+            decoration: widget.isUnderline ? TextDecoration.underline : null,
+            fontSize: widget.fontSize,
+            color: widget.fontColor,
+          ),
+        ),
       ),
     );
   }
