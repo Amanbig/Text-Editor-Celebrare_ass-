@@ -17,11 +17,25 @@ class _MyHomePageState extends State<MyHomePage> {
   Color _fontColor = Colors.black;
   Color _backgroundColor = Colors.white;
 
-  final List<DraggableText> _draggableTexts = [];
-  final List<List<DraggableText>> _undoStack = [];
-  final List<List<DraggableText>> _redoStack = [];
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  final List<List<DraggableText>> _pages = [[]];
+  final List<List<List<DraggableText>>> _undoStack = [];
+  final List<List<List<DraggableText>>> _redoStack = [];
   int _textCounter = 0;
   DraggableText? _selectedText;
+
+  @override
+void initState() {
+  super.initState();
+  // Initialize undo/redo stacks for each page
+  for (int i = 0; i < _pages.length; i++) {
+    _undoStack.add([]);
+    _redoStack.add([]);
+  }
+}
+
 
   void _addText() {
     _saveStateToUndoStack();
@@ -61,6 +75,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _addDraggableText(String text) {
+    _saveStateToUndoStack();
     setState(() {
       final newText = DraggableText(
         key: UniqueKey(),
@@ -75,7 +90,7 @@ class _MyHomePageState extends State<MyHomePage> {
         updatePosition: _updateTextPosition,
         isSelected: false,
       );
-      _draggableTexts.add(newText);
+      _pages[_currentPage].add(newText);
       _textCounter++;
       _selectedText = newText;
     });
@@ -92,7 +107,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _isItalic = text.isItalic;
       _isUnderline = text.isUnderline;
 
-      for (var draggableText in _draggableTexts) {
+      for (var draggableText in _pages[_currentPage]) {
         draggableText.isSelected = draggableText == text;
       }
     });
@@ -101,9 +116,9 @@ class _MyHomePageState extends State<MyHomePage> {
   void _updateTextPosition(DraggableText text, Offset newPosition) {
     _saveStateToUndoStack();
     setState(() {
-      final index = _draggableTexts.indexOf(text);
+      final index = _pages[_currentPage].indexOf(text);
       if (index != -1) {
-        _draggableTexts[index] = text.copyWith(position: newPosition);
+        _pages[_currentPage][index] = text.copyWith(position: newPosition);
       }
     });
   }
@@ -112,9 +127,9 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_selectedText != null) {
       _saveStateToUndoStack();
       setState(() {
-        final index = _draggableTexts.indexOf(_selectedText!);
+        final index = _pages[_currentPage].indexOf(_selectedText!);
         if (index != -1) {
-          _draggableTexts[index] = _selectedText!.copyWith(
+          _pages[_currentPage][index] = _selectedText!.copyWith(
             fontFamily: _fontFamily,
             fontColor: _fontColor,
             fontSize: _fontSize,
@@ -122,7 +137,7 @@ class _MyHomePageState extends State<MyHomePage> {
             isItalic: _isItalic,
             isUnderline: _isUnderline,
           );
-          _selectedText = _draggableTexts[index];
+          _selectedText = _pages[_currentPage][index];
         }
       });
     }
@@ -183,38 +198,72 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void _deleteSelectedText() {
+ void _deleteSelectedText() {
     if (_selectedText != null) {
+      _saveStateToUndoStack();
       setState(() {
-        _draggableTexts.remove(_selectedText);
+        _pages[_currentPage].remove(_selectedText);
         _selectedText = null;
       });
     }
   }
 
   void _saveStateToUndoStack() {
-    _undoStack.add(List.from(_draggableTexts));
-    _redoStack.clear();
+    _undoStack[_currentPage].add(List<DraggableText>.from(_pages[_currentPage]));
+    _redoStack[_currentPage].clear();
   }
 
   void _undoAction() {
-    if (_undoStack.isNotEmpty) {
-      _redoStack.add(List.from(_draggableTexts));
+    if (_undoStack[_currentPage].isNotEmpty) {
+      _redoStack[_currentPage].add(List.from(_pages[_currentPage]));
       setState(() {
-        _draggableTexts.clear();
-        _draggableTexts.addAll(_undoStack.removeLast());
+        _pages[_currentPage].clear();
+        _pages[_currentPage].addAll(_undoStack[_currentPage].removeLast());
       });
     }
   }
 
   void _redoAction() {
-    if (_redoStack.isNotEmpty) {
-      _undoStack.add(List.from(_draggableTexts));
+    if (_redoStack[_currentPage].isNotEmpty) {
+      _undoStack[_currentPage].add(List.from(_pages[_currentPage]));
       setState(() {
-        _draggableTexts.clear();
-        _draggableTexts.addAll(_redoStack.removeLast());
+        _pages[_currentPage].clear();
+        _pages[_currentPage].addAll(_redoStack[_currentPage].removeLast());
       });
     }
+  }
+
+  void _nextPage() {
+    if (_currentPage < _pages.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      setState(() {
+        _currentPage++;
+      });
+    }
+  }
+
+  void _previousPage() {
+    if (_currentPage > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      setState(() {
+        _currentPage--;
+      });
+    }
+  }
+
+  void _addPage() {
+    _saveStateToUndoStack();
+    setState(() {
+      _pages.add([]);
+      _undoStack.add([]);
+      _redoStack.add([]);
+    });
   }
 
   @override
@@ -248,7 +297,23 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Stack(
                 children: [
                   Container(color: _backgroundColor),
-                  ..._draggableTexts,
+                  ..._pages[_currentPage],
+                  Positioned(
+                    left: 10,
+                    top: MediaQuery.of(context).size.height / 2 - 20,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: _previousPage,
+                    ),
+                  ),
+                  Positioned(
+                    right: 10,
+                    top: MediaQuery.of(context).size.height / 2 - 20,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_forward),
+                      onPressed: _nextPage,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -464,7 +529,9 @@ class _DraggableTextState extends State<DraggableText> {
             setState(() {
               widget.position = Offset(
                 offset.dx,
-                offset.dy - AppBar().preferredSize.height - MediaQuery.of(context).padding.top,
+                offset.dy -
+                    AppBar().preferredSize.height -
+                    MediaQuery.of(context).padding.top,
               );
               widget.updatePosition(widget, widget.position);
             });
@@ -473,7 +540,9 @@ class _DraggableTextState extends State<DraggableText> {
             setState(() {
               widget.position = Offset(
                 details.offset.dx,
-                details.offset.dy - AppBar().preferredSize.height - MediaQuery.of(context).padding.top,
+                details.offset.dy -
+                    AppBar().preferredSize.height -
+                    MediaQuery.of(context).padding.top,
               );
               widget.updatePosition(widget, widget.position);
             });
@@ -485,23 +554,15 @@ class _DraggableTextState extends State<DraggableText> {
   }
 
   Widget _buildText() {
-    return Container(
-      padding: const EdgeInsets.all(4.0),
-      child:GestureDetector(
-        onTap: () {
-          widget.onSelected(widget);
-          },
-        child: Text(
-          widget.text,
-          style: TextStyle(
-            fontFamily: widget.fontFamily,
-            fontWeight: widget.isBold ? FontWeight.bold : FontWeight.normal,
-            fontStyle: widget.isItalic ? FontStyle.italic : FontStyle.normal,
-            decoration: widget.isUnderline ? TextDecoration.underline : null,
-            fontSize: widget.fontSize,
-            color: widget.fontColor,
-          ),
-        ),
+    return Text(
+      widget.text,
+      style: TextStyle(
+        fontFamily: widget.fontFamily,
+        fontWeight: widget.isBold ? FontWeight.bold : FontWeight.normal,
+        fontStyle: widget.isItalic ? FontStyle.italic : FontStyle.normal,
+        decoration: widget.isUnderline ? TextDecoration.underline : null,
+        fontSize: widget.fontSize,
+        color: widget.fontColor,
       ),
     );
   }
