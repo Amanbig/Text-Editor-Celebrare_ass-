@@ -486,12 +486,6 @@ class _DraggableTextState extends State<DraggableText> {
 
   Widget _buildText() {
     return Container(
-      decoration: widget.isSelected
-          ? BoxDecoration(
-              border: Border.all(color: Colors.blueAccent, width: 2),
-              borderRadius: BorderRadius.circular(4),
-            )
-          : null,
       padding: const EdgeInsets.all(4.0),
       child:GestureDetector(
         onTap: () {
