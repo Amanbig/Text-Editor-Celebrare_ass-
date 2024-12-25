@@ -15,27 +15,31 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isUnderline = false;
   double _fontSize = 16.0;
   Color _fontColor = Colors.black;
-  Color _backgroundColor = Colors.white;
+  final List<Color> _backgroundColors = [
+    Colors.white,
+    Colors.white,
+    Colors.white
+  ];
 
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<List<DraggableText>> _pages = [[]];
-  final List<List<List<DraggableText>>> _undoStack = [];
-  final List<List<List<DraggableText>>> _redoStack = [];
+  final List<List<DraggableText>> _pages = [[], [], []];
+  final List<List<List<DraggableText>>> _undoStack = [[], [], []];
+  final List<List<List<DraggableText>>> _redoStack = [[], [], []];
   int _textCounter = 0;
   DraggableText? _selectedText;
 
   @override
-void initState() {
-  super.initState();
-  // Initialize undo/redo stacks for each page
-  for (int i = 0; i < _pages.length; i++) {
-    _undoStack.add([]);
-    _redoStack.add([]);
+  void initState() {
+    super.initState();
+    // Initialize undo/redo stacks for each page
+    _pageController.addListener(() {
+      setState(() {
+        _currentPage = _pageController.page!.round();
+      });
+    });
   }
-}
-
 
   void _addText() {
     _saveStateToUndoStack();
@@ -179,10 +183,10 @@ void initState() {
           title: const Text("Choose Background Color"),
           content: SingleChildScrollView(
             child: BlockPicker(
-              pickerColor: _backgroundColor,
+              pickerColor: _backgroundColors[_currentPage],
               onColorChanged: (color) {
                 setState(() {
-                  _backgroundColor = color;
+                  _backgroundColors[_currentPage] = color;
                 });
               },
             ),
@@ -198,7 +202,7 @@ void initState() {
     );
   }
 
- void _deleteSelectedText() {
+  void _deleteSelectedText() {
     if (_selectedText != null) {
       _saveStateToUndoStack();
       setState(() {
@@ -209,7 +213,8 @@ void initState() {
   }
 
   void _saveStateToUndoStack() {
-    _undoStack[_currentPage].add(List<DraggableText>.from(_pages[_currentPage]));
+    _undoStack[_currentPage]
+        .add(List<DraggableText>.from(_pages[_currentPage]));
     _redoStack[_currentPage].clear();
   }
 
@@ -263,6 +268,7 @@ void initState() {
       _pages.add([]);
       _undoStack.add([]);
       _redoStack.add([]);
+      _backgroundColors.add(Colors.white);
     });
   }
 
@@ -271,21 +277,33 @@ void initState() {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Celebrare',style: TextStyle(
-          color: Colors.white,
-        ),),
+        title: const Text(
+          'Celebrare',
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: _undoAction,
-            icon: const Icon(Icons.undo,color: Colors.white,),
+            icon: const Icon(
+              Icons.undo,
+              color: Colors.white,
+            ),
           ),
           IconButton(
             onPressed: _redoAction,
-            icon: const Icon(Icons.redo,color: Colors.white,),
+            icon: const Icon(
+              Icons.redo,
+              color: Colors.white,
+            ),
           ),
           IconButton(
             onPressed: _deleteSelectedText,
-            icon: const Icon(Icons.delete,color: Colors.white,),
+            icon: const Icon(
+              Icons.delete,
+              color: Colors.white,
+            ),
           ),
         ],
         backgroundColor: Colors.black,
@@ -294,27 +312,33 @@ void initState() {
         child: Column(
           children: [
             Expanded(
-              child: Stack(
-                children: [
-                  Container(color: _backgroundColor),
-                  ..._pages[_currentPage],
-                  Positioned(
-                    left: 10,
-                    top: MediaQuery.of(context).size.height / 2 - 20,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: _previousPage,
-                    ),
-                  ),
-                  Positioned(
-                    right: 10,
-                    top: MediaQuery.of(context).size.height / 2 - 20,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_forward),
-                      onPressed: _nextPage,
-                    ),
-                  ),
-                ],
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _pages.length,
+                itemBuilder: (context, index) {
+                  return Stack(
+                    children: [
+                      Container(color: _backgroundColors[index]),
+                      ..._pages[index],
+                      Positioned(
+                        left: 10,
+                        top: MediaQuery.of(context).size.height / 2 - 20,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: _previousPage,
+                        ),
+                      ),
+                      Positioned(
+                        right: 10,
+                        top: MediaQuery.of(context).size.height / 2 - 20,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_forward),
+                          onPressed: _nextPage,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             Padding(
@@ -323,7 +347,12 @@ void initState() {
                 children: [
                   Row(
                     children: [
-                      const Text("Font Size:",style: TextStyle(color: Colors.white,),),
+                      const Text(
+                        "Font Size:",
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
                       Expanded(
                         child: Slider(
                           value: _fontSize,
@@ -348,14 +377,42 @@ void initState() {
                         value: _fontFamily,
                         dropdownColor: Colors.black,
                         items: const [
-                          DropdownMenuItem(value: 'Arial', child: Text('Arial',style: TextStyle(color: Colors.white,),)),
-                          DropdownMenuItem(value: 'Times New Roman', child: Text('Times New Roman',style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Courier New', child: Text('Courier New',style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Verdana', child: Text('Verdana',style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Georgia', child: Text('Georgia',style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Comic Sans MS', child: Text('Comic Sans MS',style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Trebuchet MS', child: Text('Trebuchet MS',style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Impact', child: Text('Impact',style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Arial',
+                              child: Text(
+                                'Arial',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                ),
+                              )),
+                          DropdownMenuItem(
+                              value: 'Times New Roman',
+                              child: Text('Times New Roman',
+                                  style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Courier New',
+                              child: Text('Courier New',
+                                  style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Verdana',
+                              child: Text('Verdana',
+                                  style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Georgia',
+                              child: Text('Georgia',
+                                  style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Comic Sans MS',
+                              child: Text('Comic Sans MS',
+                                  style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Trebuchet MS',
+                              child: Text('Trebuchet MS',
+                                  style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                              value: 'Impact',
+                              child: Text('Impact',
+                                  style: TextStyle(color: Colors.white))),
                         ],
                         style: const TextStyle(color: Colors.white),
                         onChanged: (newValue) {
@@ -402,7 +459,10 @@ void initState() {
                     children: [
                       const Text(
                         "Font Color:",
-                        style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white,),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       TextButton(
                         onPressed: _changeFontColor,
@@ -411,13 +471,16 @@ void initState() {
                           height: 24,
                           decoration: BoxDecoration(
                             color: _fontColor,
-                          border: Border.all(color: Colors.white),
+                            border: Border.all(color: Colors.white),
                           ),
                         ),
                       ),
                       const Text(
                         "Background Color:",
-                        style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white,),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       TextButton(
                         onPressed: _changeBackgroundColor,
@@ -425,17 +488,23 @@ void initState() {
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
-                            color: _backgroundColor,
-                          border: Border.all(color: Colors.white),
+                            color:  _backgroundColors[_currentPage],
+                            border: Border.all(color: Colors.white),
                           ),
                         ),
                       ),
                     ],
                   ),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.black),
                     onPressed: _addText,
-                    child: const Text("Add Text",style: TextStyle(color: Colors.white,),),
+                    child: const Text(
+                      "Add Text",
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ],
               ),
