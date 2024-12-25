@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:text_editor/components/draggable_text.dart';
+import 'package:text_editor/components/edit_options.dart';
+import 'package:text_editor/components/options.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -104,7 +106,7 @@ class _MyHomePageState extends State<MyHomePage> {
         isUnderline: _isUnderline,
         onSelected: _handleTextSelection,
         updatePosition: _updateTextPosition,
-        isSelected: false,
+        isSelected: false, 
       );
       _pages[_currentPage].add(newText);
       _textCounter++;
@@ -185,6 +187,12 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       },
     );
+  }
+  
+  void _showEditOptions() {
+    setState(() {
+      _selectedOption = 1;
+    });
   }
 
   void _changeBackgroundColor() {
@@ -324,20 +332,20 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           children: [
             Expanded(
-              child: AspectRatio(
-              aspectRatio: 9 / 16,
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _pages.length,
                 itemBuilder: (context, index) {
                 return Stack(
                   children: [
-                  Container(color: _backgroundColors[index]),
+                  Center(
+                    child: AspectRatio(aspectRatio: 9 / 16,
+                    child: Container(color: _backgroundColors[index])),
+                  ),
                   ..._pages[index],
                   ],
                 );
                 },
-              ),
               ),
             ),
             Row(
@@ -371,175 +379,51 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        "Font Size:",
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      Expanded(
-                        child: Slider(
-                          value: _fontSize,
-                          min: 8.0,
-                          max: 48.0,
-                          divisions: 20,
-                          label: _fontSize.toStringAsFixed(1),
-                          onChanged: (newValue) {
-                            setState(() {
-                              _fontSize = newValue;
-                              _updateSelectedTextStyle();
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      DropdownButton<String>(
-                        value: _fontFamily,
-                        dropdownColor: Colors.black,
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'Arial',
-                              child: Text(
-                                'Arial',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                ),
-                              )),
-                          DropdownMenuItem(
-                              value: 'Times New Roman',
-                              child: Text('Times New Roman',
-                                  style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(
-                              value: 'Courier New',
-                              child: Text('Courier New',
-                                  style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(
-                              value: 'Verdana',
-                              child: Text('Verdana',
-                                  style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(
-                              value: 'Georgia',
-                              child: Text('Georgia',
-                                  style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(
-                              value: 'Comic Sans MS',
-                              child: Text('Comic Sans MS',
-                                  style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(
-                              value: 'Trebuchet MS',
-                              child: Text('Trebuchet MS',
-                                  style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(
-                              value: 'Impact',
-                              child: Text('Impact',
-                                  style: TextStyle(color: Colors.white))),
-                        ],
-                        style: const TextStyle(color: Colors.white),
-                        onChanged: (newValue) {
-                          setState(() {
-                            _fontFamily = newValue!;
-                            _updateSelectedTextStyle();
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.format_bold,
-                            color: _isBold ? Colors.blue : Colors.white),
-                        onPressed: () {
-                          setState(() {
-                            _isBold = !_isBold;
-                            _updateSelectedTextStyle();
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.format_italic,
-                            color: _isItalic ? Colors.blue : Colors.white),
-                        onPressed: () {
-                          setState(() {
-                            _isItalic = !_isItalic;
-                            _updateSelectedTextStyle();
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.format_underline,
-                            color: _isUnderline ? Colors.blue : Colors.white),
-                        onPressed: () {
-                          setState(() {
-                            _isUnderline = !_isUnderline;
-                            _updateSelectedTextStyle();
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        "Font Color:",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _changeFontColor,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: _fontColor,
-                            border: Border.all(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      const Text(
-                        "Background Color:",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _changeBackgroundColor,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color:  _backgroundColors[_currentPage],
-                            border: Border.all(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  ElevatedButton(
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.black,
-                        side: const BorderSide(color: Colors.white)),
-                    onPressed: _addText,
-                    child: const Text(
-                      "Add Text",
-                      style: TextStyle(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _selectedOption == 1
+              ? EditOptions(
+                fontSize: _fontSize,
+                fontFamily: _fontFamily,
+                isBold: _isBold,
+                isItalic: _isItalic,
+                isUnderline: _isUnderline,
+                fontColor: _fontColor,
+                backgroundColor: _backgroundColors[_currentPage],
+                onFontSizeChanged: (value) {
+                  setState(() {
+                  _fontSize = value;
+                  _updateSelectedTextStyle();
+                  });
+                },
+                onFontFamilyChanged: (value) {
+                  setState(() {
+                  _fontFamily = value;
+                  _updateSelectedTextStyle();
+                  });
+                },
+                onBoldChanged: (value) {
+                  setState(() {
+                  _isBold = value;
+                  _updateSelectedTextStyle();
+                  });
+                },
+                onItalicChanged: (value) {
+                  setState(() {
+                  _isItalic = value;
+                  _updateSelectedTextStyle();
+                  });
+                },
+                onUnderlineChanged: (value) {
+                  setState(() {
+                  _isUnderline = value;
+                  _updateSelectedTextStyle();
+                  });
+                },
+                onChangeFontColor: _changeFontColor,
+                onChangeBackgroundColor: _changeBackgroundColor,
+                onAddText: _addText,
+                
+                )
+              : Options(onEditOptions: _showEditOptions),
           ],
         ),
       ),

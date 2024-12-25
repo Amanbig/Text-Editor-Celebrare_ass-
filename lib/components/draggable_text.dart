@@ -80,27 +80,23 @@ class _DraggableTextState extends State<DraggableText> {
           },
           onDraggableCanceled: (velocity, offset) {
             setState(() {
-              // Correct the position after drag cancellation
               widget.position = Offset(
                 offset.dx,
-                offset.dy - AppBar().preferredSize.height - MediaQuery.of(context).padding.top,
+                offset.dy -
+                    AppBar().preferredSize.height -
+                    MediaQuery.of(context).padding.top,
               );
               widget.updatePosition(widget, widget.position);
             });
           },
           onDragEnd: (details) {
             setState(() {
-              // Calculate the effective height and width of the draggable area
-              double pageHeight = MediaQuery.of(context).size.height;
-              double pageWidth = MediaQuery.of(context).size.width;
-
-              // Ensure the position respects the boundaries
-              double newX = details.offset.dx.clamp(0.0, pageWidth);
-              double newY = details.offset.dy
-                  .clamp(AppBar().preferredSize.height + MediaQuery.of(context).padding.top, pageHeight);
-
-              // Update position
-              widget.position = Offset(newX, newY);
+              widget.position = Offset(
+                details.offset.dx,
+                details.offset.dy -
+                    AppBar().preferredSize.height -
+                    MediaQuery.of(context).padding.top,
+              );
               widget.updatePosition(widget, widget.position);
             });
           },
