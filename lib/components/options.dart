@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 class Options extends StatelessWidget {
   final Function() onEditOptions;
-  const Options({super.key, required this.onEditOptions});
+  final Function() onEditOrder;
+  const Options({super.key, required this.onEditOptions,required this.onEditOrder});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +26,7 @@ class Options extends StatelessWidget {
             ),
           ),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: onEditOrder,
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
                 side: const BorderSide(color: Colors.white)

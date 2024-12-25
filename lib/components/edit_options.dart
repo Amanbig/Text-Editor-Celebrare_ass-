@@ -16,6 +16,7 @@ class EditOptions extends StatefulWidget {
   final Function() onChangeFontColor;
   final Function() onChangeBackgroundColor;
   final Function() onAddText;
+  final Function() onSelectedState;
 
   const EditOptions({
     super.key,
@@ -34,6 +35,7 @@ class EditOptions extends StatefulWidget {
     required this.onChangeFontColor,
     required this.onChangeBackgroundColor,
     required this.onAddText,
+    required this.onSelectedState,
   });
 
   @override
@@ -98,6 +100,10 @@ class _EditOptionsState extends State<EditOptions> {
 
   void _addText() {
     widget.onAddText();
+  }
+
+  void _onSelectedState() {
+    widget.onSelectedState();
   }
 
   @override
@@ -256,17 +262,37 @@ class _EditOptionsState extends State<EditOptions> {
               ),
             ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                side: const BorderSide(color: Colors.white)),
-            onPressed: _addText,
-            child: const Text(
-              "Add Text",
-              style: TextStyle(
-                color: Colors.white,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    side: const BorderSide(color: Colors.white)),
+                onPressed: _addText,
+                child: const Text(
+                  "Add Text",
+                  style: TextStyle(
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
+              ElevatedButton(onPressed: _onSelectedState, style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[800]!,
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.arrow_back, color: Colors.white,),
+                  const Text(
+                      "Go Back",
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                ],
+              ),
+              ),
+            ],
           ),
         ],
       ),

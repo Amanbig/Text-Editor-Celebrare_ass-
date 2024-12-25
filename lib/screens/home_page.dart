@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:text_editor/components/draggable_text.dart';
 import 'package:text_editor/components/edit_options.dart';
+import 'package:text_editor/components/edit_order.dart';
 import 'package:text_editor/components/options.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -195,6 +196,45 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _showMainOptions() {
+    setState(() {
+      _selectedOption = 0;
+    });
+  }
+
+  void _showPageOrderOptions() {
+    setState(() {
+      _selectedOption = 2;
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => EditOrderPage(
+          pages: _pages,
+          backgroundColors: _backgroundColors,
+          onReorder: _reorderPages,
+          onUpdatePages: _updatePages,
+          onAddPage: _addPage,
+        ),
+      ));
+    });
+  }
+
+  void _reorderPages(List<List<DraggableText>> reorderedPages, List<Color> reorderedColors) {
+    setState(() {
+      _pages.clear();
+      _pages.addAll(reorderedPages);
+      _backgroundColors.clear();
+      _backgroundColors.addAll(reorderedColors);
+    });
+  }
+
+  void _updatePages(List<List<DraggableText>> updatedPages, List<Color> updatedColors) {
+    setState(() {
+      _pages.clear();
+      _pages.addAll(updatedPages);
+      _backgroundColors.clear();
+      _backgroundColors.addAll(updatedColors);
+    });
+  }
+
   void _changeBackgroundColor() {
     showDialog(
       context: context,
@@ -303,7 +343,7 @@ class _MyHomePageState extends State<MyHomePage> {
             color: Colors.white,
           ),
         ),
-        actions: [
+        actions: _selectedOption==1?[
           IconButton(
             onPressed: _undoAction,
             icon: const Icon(
@@ -325,7 +365,7 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Colors.white,
             ),
           ),
-        ],
+        ]:null,
         backgroundColor: Colors.black,
       ),
       body: SafeArea(
@@ -421,9 +461,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 onChangeFontColor: _changeFontColor,
                 onChangeBackgroundColor: _changeBackgroundColor,
                 onAddText: _addText,
+                onSelectedState:_showMainOptions,
                 
                 )
-              : Options(onEditOptions: _showEditOptions),
+              : Options(onEditOptions: _showEditOptions,onEditOrder: _showPageOrderOptions,),
           ],
         ),
       ),
