@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:text_editor/components/draggable_text.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -20,6 +21,7 @@ class _MyHomePageState extends State<MyHomePage> {
     Colors.white,
     Colors.white
   ];
+  int _selectedOption = 0;
 
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -322,34 +324,52 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           children: [
             Expanded(
+              child: AspectRatio(
+              aspectRatio: 9 / 16,
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _pages.length,
                 itemBuilder: (context, index) {
-                  return Stack(
-                    children: [
-                      Container(color: _backgroundColors[index]),
-                      ..._pages[index],
-                      Positioned(
-                        left: 10,
-                        top: MediaQuery.of(context).size.height / 2 - 20,
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: _previousPage,
-                        ),
-                      ),
-                      Positioned(
-                        right: 10,
-                        top: MediaQuery.of(context).size.height / 2 - 20,
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_forward),
-                          onPressed: _nextPage,
-                        ),
-                      ),
-                    ],
-                  );
+                return Stack(
+                  children: [
+                  Container(color: _backgroundColors[index]),
+                  ..._pages[index],
+                  ],
+                );
                 },
               ),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _previousPage,
+                color: _currentPage > 0?Colors.white:Colors.white.withOpacity(0.5),
+              ),
+              Row(
+                children: List<Widget>.generate(
+                _pages.length,
+                (index) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                  width: 8.0,
+                  height: 8.0,
+                  decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _currentPage == index
+                    ? Colors.white
+                    : Colors.white.withOpacity(0.5),
+                  ),
+                ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: _nextPage,
+                color:_currentPage < _pages.length - 1? Colors.white:Colors.white.withOpacity(0.5),
+              ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -527,123 +547,4 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class DraggableText extends StatefulWidget {
-  final String text;
-  final String fontFamily;
-  final Color fontColor;
-  final double fontSize;
-  final bool isBold;
-  final bool isItalic;
-  final bool isUnderline;
-  Offset position;
-  final Function(DraggableText) onSelected;
-  final Function(DraggableText, Offset) updatePosition;
-  bool isSelected;
 
-  DraggableText({
-    super.key,
-    required this.text,
-    required this.fontFamily,
-    required this.fontColor,
-    required this.fontSize,
-    required this.isBold,
-    required this.isItalic,
-    required this.isUnderline,
-    required this.onSelected,
-    required this.updatePosition,
-    this.position = const Offset(50, 50),
-    this.isSelected = false,
-  });
-
-  DraggableText copyWith({
-    String? text,
-    String? fontFamily,
-    Color? fontColor,
-    double? fontSize,
-    bool? isBold,
-    bool? isItalic,
-    bool? isUnderline,
-    Offset? position,
-    bool? isSelected,
-  }) {
-    return DraggableText(
-      key: key,
-      text: text ?? this.text,
-      fontFamily: fontFamily ?? this.fontFamily,
-      fontColor: fontColor ?? this.fontColor,
-      fontSize: fontSize ?? this.fontSize,
-      isBold: isBold ?? this.isBold,
-      isItalic: isItalic ?? this.isItalic,
-      isUnderline: isUnderline ?? this.isUnderline,
-      position: position ?? this.position,
-      onSelected: onSelected,
-      updatePosition: updatePosition,
-      isSelected: isSelected ?? this.isSelected,
-    );
-  }
-
-  @override
-  State<DraggableText> createState() => _DraggableTextState();
-}
-
-class _DraggableTextState extends State<DraggableText> {
-  Offset? initialPosition;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: widget.position.dx,
-      top: widget.position.dy,
-      child: GestureDetector(
-        onTap: () => widget.onSelected(widget),
-        child: Draggable(
-          feedback: Material(
-            color: Colors.transparent,
-            child: _buildText(),
-          ),
-          childWhenDragging: Container(),
-          onDragStarted: () {
-            initialPosition = widget.position;
-          },
-          onDraggableCanceled: (velocity, offset) {
-            setState(() {
-              widget.position = Offset(
-                offset.dx,
-                offset.dy -
-                    AppBar().preferredSize.height -
-                    MediaQuery.of(context).padding.top,
-              );
-              widget.updatePosition(widget, widget.position);
-            });
-          },
-          onDragEnd: (details) {
-            setState(() {
-              widget.position = Offset(
-                details.offset.dx,
-                details.offset.dy -
-                    AppBar().preferredSize.height -
-                    MediaQuery.of(context).padding.top,
-              );
-              widget.updatePosition(widget, widget.position);
-            });
-          },
-          child: _buildText(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildText() {
-    return Text(
-      widget.text,
-      style: TextStyle(
-        fontFamily: widget.fontFamily,
-        fontWeight: widget.isBold ? FontWeight.bold : FontWeight.normal,
-        fontStyle: widget.isItalic ? FontStyle.italic : FontStyle.normal,
-        decoration: widget.isUnderline ? TextDecoration.underline : null,
-        fontSize: widget.fontSize,
-        color: widget.fontColor,
-      ),
-    );
-  }
-}
