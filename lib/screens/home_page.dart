@@ -52,28 +52,38 @@ class _MyHomePageState extends State<MyHomePage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Add Text"),
-          content: TextField(
-            controller: textController,
-            decoration: const InputDecoration(hintText: "Enter your text"),
+      return AlertDialog(
+        backgroundColor: Colors.black,
+        title: const Text("Add Text", style: TextStyle(color: Colors.white)),
+        content: TextField(
+        controller: textController,
+        decoration: const InputDecoration(hintText: "Enter your text", hintStyle: TextStyle(color: Colors.white)),
+        style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.black,
+            side: const BorderSide(color: Colors.white),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _addDraggableText(textController.text.isNotEmpty
-                    ? textController.text
-                    : 'Text $_textCounter');
-              },
-              child: const Text("Add"),
-            ),
-          ],
-        );
+          child: const Text("Cancel", style: TextStyle(color: Colors.white)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            _addDraggableText(textController.text.isNotEmpty
+          ? textController.text
+          : 'Text $_textCounter');
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black,
+            side: const BorderSide(color: Colors.white),
+          ),
+          child: const Text("Add", style: TextStyle(color: Colors.white)),
+        ),
+        ],
+      );
       },
     );
   }
@@ -497,7 +507,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   ElevatedButton(
                     style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                        ElevatedButton.styleFrom(backgroundColor: Colors.black,
+                        side: const BorderSide(color: Colors.white)),
                     onPressed: _addText,
                     child: const Text(
                       "Add Text",
