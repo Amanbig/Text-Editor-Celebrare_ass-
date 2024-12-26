@@ -55,6 +55,35 @@ class DraggableText extends StatefulWidget {
     );
   }
 
+  Map<String, dynamic> toMap() {
+  return {
+    'text': text,
+    'fontFamily': fontFamily,
+    'fontColor': fontColor.value, // Store color as an int value
+    'fontSize': fontSize,
+    'isBold': isBold,
+    'isItalic': isItalic,
+    'isUnderline': isUnderline,
+    'position': {'dx': position.dx, 'dy': position.dy}, // Offset as a Map
+  };
+}
+
+static DraggableText fromMap(Map<String, dynamic> map, Function(DraggableText) onSelected, Function(DraggableText, Offset) updatePosition) {
+  return DraggableText(
+    text: map['text'],
+    fontFamily: map['fontFamily'],
+    fontColor: Color(map['fontColor']),
+    fontSize: map['fontSize'],
+    isBold: map['isBold'],
+    isItalic: map['isItalic'],
+    isUnderline: map['isUnderline'],
+    position: Offset(map['position']['dx'], map['position']['dy']),
+    onSelected: onSelected,
+    updatePosition: updatePosition,
+  );
+}
+
+
   @override
   State<DraggableText> createState() => _DraggableTextState();
 }
@@ -119,4 +148,5 @@ class _DraggableTextState extends State<DraggableText> {
       ),
     );
   }
+  
 }

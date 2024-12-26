@@ -1,8 +1,11 @@
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:text_editor/components/draggable_text.dart';
 import 'package:text_editor/components/edit_options.dart';
-import 'package:text_editor/components/edit_order.dart';
+import 'package:text_editor/screens/edit_order.dart';
 import 'package:text_editor/components/options.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -29,22 +32,149 @@ class _MyHomePageState extends State<MyHomePage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<List<DraggableText>> _pages = [[], [], []];
-  final List<List<List<DraggableText>>> _undoStack = [[], [], []];
-  final List<List<List<DraggableText>>> _redoStack = [[], [], []];
+  final List<List<DraggableText>> _pages = [];
+  final List<List<List<DraggableText>>> _undoStack = [];
+  final List<List<List<DraggableText>>> _redoStack = [];
   int _textCounter = 0;
   DraggableText? _selectedText;
 
   @override
   void initState() {
     super.initState();
-    // Initialize undo/redo stacks for each page
+    _loadDataFromFirestore(
+      'document_id', 
+      _handleTextSelection,
+      _updateTextPosition,
+    );
     _pageController.addListener(() {
       setState(() {
         _currentPage = _pageController.page!.round();
       });
     });
   }
+
+Future<void> _saveDataToFirestore(String documentId,
+List<List<DraggableText>> pages,
+    List<List<List<DraggableText>>> undoStack,
+    List<List<List<DraggableText>>> redoStack
+) async {
+  try {
+    final firestore = FirebaseFirestore.instance;
+
+    // Flatten the pages into a list of maps
+    List<List<Map<String, dynamic>>> serializedPages = pages
+        .map((page) => page.map((text) => text.toMap()).toList())
+        .toList();
+
+    List<List<List<Map<String, dynamic>>>> serializedUndoStack = undoStack
+        .map((undo) =>
+            undo.map((page) => page.map((text) => text.toMap()).toList()).toList())
+        .toList();
+
+    // Flatten the redoStack
+    List<List<List<Map<String, dynamic>>>> serializedRedoStack = redoStack
+        .map((redo) =>
+            redo.map((page) => page.map((text) => text.toMap()).toList()).toList())
+        .toList();
+
+    // Create a map to hold all data
+    Map<String, dynamic> data = {
+      'pages': serializedPages,
+      'undoStack': serializedUndoStack,
+      'redoStack': serializedRedoStack,
+    };
+
+    // Convert the data map to a JSON string
+
+    // Reference to the document
+    DocumentReference docRef = firestore.collection('your_collection').doc(documentId);
+
+    // Check if the document exists
+    DocumentSnapshot docSnapshot = await docRef.get();
+
+    if (docSnapshot.exists) {
+      // Document exists, update it
+      await docRef.update({
+        'data': data,
+      });
+      print("Data updated successfully!");
+    } else {
+      // Document does not exist, create it
+      await docRef.set({
+        'data': data,
+      });
+      print("Data saved successfully!");
+    }
+  } catch (e) {
+    print("Error updating data: $e");
+  }
+}
+
+
+
+
+  Future<void> _loadDataFromFirestore(
+    String documentId,
+    Function(DraggableText) onSelected,
+    Function(DraggableText, Offset) updatePosition) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      DocumentSnapshot snapshot =
+          await firestore.collection('your_collection').doc(documentId).get();
+
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>;
+
+        _pages.clear();
+        _undoStack.clear();
+        _redoStack.clear();
+
+        // Deserialize pages
+        for (var page in data['pages']) {
+          List<DraggableText> pageTexts = page
+              .map<DraggableText>((textMap) =>
+                  DraggableText.fromMap(textMap, onSelected, updatePosition))
+              .toList();
+          _pages.add(pageTexts);
+        }
+
+        // Deserialize undoStack
+        for (var undo in data['undoStack']) {
+          List<List<DraggableText>> undoPages = undo
+              .map<List<DraggableText>>((page) =>
+                  page.map<DraggableText>((textMap) => DraggableText.fromMap(
+                      textMap, onSelected, updatePosition)).toList())
+              .toList();
+          _undoStack.add(undoPages);
+        }
+
+        // Deserialize redoStack
+        for (var redo in data['redoStack']) {
+          List<List<DraggableText>> redoPages = redo
+              .map<List<DraggableText>>((page) =>
+                  page.map<DraggableText>((textMap) => DraggableText.fromMap(
+                      textMap, onSelected, updatePosition)).toList())
+              .toList();
+          _redoStack.add(redoPages);
+        }
+
+        print("Data loaded successfully!");
+      } else {
+        print("No document found with ID: $documentId");
+        // Optionally create a new document if not found
+        await firestore.collection('your_collection').doc(documentId).set({
+          'pages': [],
+          'undoStack': [],
+          'redoStack': [],
+        });
+        print("New document created with ID: $documentId");
+      }
+    } catch (e) {
+      print("Error loading data: $e");
+    }
+  }
+
 
   void _addText() {
     _saveStateToUndoStack();
@@ -113,6 +243,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _textCounter++;
       _selectedText = newText;
     });
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   void _handleTextSelection(DraggableText text) {
@@ -140,6 +271,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage][index] = text.copyWith(position: newPosition);
       }
     });
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   void _updateSelectedTextStyle() {
@@ -159,6 +291,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _selectedText = _pages[_currentPage][index];
         }
       });
+      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
     }
   }
 
@@ -215,6 +348,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ));
     });
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   void _reorderPages(List<List<DraggableText>> reorderedPages, List<Color> reorderedColors) {
@@ -224,6 +358,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _backgroundColors.clear();
       _backgroundColors.addAll(reorderedColors);
     });
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   void _updatePages(List<List<DraggableText>> updatedPages, List<Color> updatedColors) {
@@ -233,6 +368,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _backgroundColors.clear();
       _backgroundColors.addAll(updatedColors);
     });
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   void _changeBackgroundColor() {
@@ -260,6 +396,7 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       },
     );
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   void _deleteSelectedText() {
@@ -269,6 +406,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage].remove(_selectedText);
         _selectedText = null;
       });
+      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
     }
   }
 
@@ -285,6 +423,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage].clear();
         _pages[_currentPage].addAll(_undoStack[_currentPage].removeLast());
       });
+      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
     }
   }
 
@@ -295,6 +434,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage].clear();
         _pages[_currentPage].addAll(_redoStack[_currentPage].removeLast());
       });
+      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
     }
   }
 
@@ -330,6 +470,10 @@ class _MyHomePageState extends State<MyHomePage> {
       _redoStack.add([]);
       _backgroundColors.add(Colors.white);
     });
+    print("Pages: $_pages");
+print("Undo Stack: $_undoStack");
+print("Redo Stack: $_redoStack");
+    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
   }
 
   @override
@@ -471,5 +615,3 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
-
-
