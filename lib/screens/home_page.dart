@@ -42,10 +42,11 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _loadDataFromFirestore(
-      'document_id', 
+      'document_id',
       _handleTextSelection,
       _updateTextPosition,
     );
+    setState(() {});
     _pageController.addListener(() {
       setState(() {
         _currentPage = _pageController.page!.round();
@@ -53,70 +54,55 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-Future<void> _saveDataToFirestore(String documentId,
-List<List<DraggableText>> pages,
-    List<List<List<DraggableText>>> undoStack,
-    List<List<List<DraggableText>>> redoStack
-) async {
-  try {
-    final firestore = FirebaseFirestore.instance;
+  Future<void> _saveDataToFirestore(
+      String documentId,
+      List<List<DraggableText>> pages,
+    ) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
 
-    // Flatten the pages into a list of maps
-    List<List<Map<String, dynamic>>> serializedPages = pages
-        .map((page) => page.map((text) => text.toMap()).toList())
-        .toList();
+      // Flatten the pages into a list of maps
+      List<List<Map<String, dynamic>>> serializedPages = pages
+          .map((page) => page.map((text) => text.toMap()).toList())
+          .toList();
 
-    List<List<List<Map<String, dynamic>>>> serializedUndoStack = undoStack
-        .map((undo) =>
-            undo.map((page) => page.map((text) => text.toMap()).toList()).toList())
-        .toList();
+      // Create a map to hold all data
+      Map<String, dynamic> data = {
+        'pages': serializedPages,
+      };
 
-    // Flatten the redoStack
-    List<List<List<Map<String, dynamic>>>> serializedRedoStack = redoStack
-        .map((redo) =>
-            redo.map((page) => page.map((text) => text.toMap()).toList()).toList())
-        .toList();
+      // Convert the data map to a JSON string
+      String jsonData = jsonEncode(data);
 
-    // Create a map to hold all data
-    Map<String, dynamic> data = {
-      'pages': serializedPages,
-      'undoStack': serializedUndoStack,
-      'redoStack': serializedRedoStack,
-    };
+      // Reference to the document
+      DocumentReference docRef =
+          firestore.collection('your_collection').doc(documentId);
 
-    // Convert the data map to a JSON string
+      // Check if the document exists
+      DocumentSnapshot docSnapshot = await docRef.get();
 
-    // Reference to the document
-    DocumentReference docRef = firestore.collection('your_collection').doc(documentId);
-
-    // Check if the document exists
-    DocumentSnapshot docSnapshot = await docRef.get();
-
-    if (docSnapshot.exists) {
-      // Document exists, update it
-      await docRef.update({
-        'data': data,
-      });
-      print("Data updated successfully!");
-    } else {
-      // Document does not exist, create it
-      await docRef.set({
-        'data': data,
-      });
-      print("Data saved successfully!");
+      if (docSnapshot.exists) {
+        // Document exists, update it
+        await docRef.update({
+          'data': jsonData,
+        });
+        print("Data updated successfully!");
+      } else {
+        // Document does not exist, create it
+        await docRef.set({
+          'data': jsonData,
+        });
+        print("Data saved successfully!");
+      }
+    } catch (e) {
+      print("Error updating data: $e");
     }
-  } catch (e) {
-    print("Error updating data: $e");
   }
-}
-
-
-
 
   Future<void> _loadDataFromFirestore(
-    String documentId,
-    Function(DraggableText) onSelected,
-    Function(DraggableText, Offset) updatePosition) async {
+      String documentId,
+      Function(DraggableText) onSelected,
+      Function(DraggableText, Offset) updatePosition) async {
     try {
       final firestore = FirebaseFirestore.instance;
 
@@ -126,55 +112,62 @@ List<List<DraggableText>> pages,
       if (snapshot.exists) {
         final data = snapshot.data() as Map<String, dynamic>;
 
-        _pages.clear();
-        _undoStack.clear();
-        _redoStack.clear();
+        // Check if the 'data' field is a string (as it contains the JSON string)
+        if (data['data'] is String) {
+          // Decode the JSON string into a Map
+          final jsonData = jsonDecode(data['data']) as Map<String, dynamic>;
 
-        // Deserialize pages
-        for (var page in data['pages']) {
-          List<DraggableText> pageTexts = page
-              .map<DraggableText>((textMap) =>
-                  DraggableText.fromMap(textMap, onSelected, updatePosition))
-              .toList();
-          _pages.add(pageTexts);
+          _pages.clear();
+          _undoStack.clear();
+          _redoStack.clear();
+
+          // Deserialize pages (ensure pages is a List)
+          if (jsonData['pages'] is List) {
+            List pagesData = jsonData['pages'];
+            for (var page in pagesData) {
+              if (page is List) {
+                List<DraggableText> pageTexts = [];
+                for (var textMap in page) {
+                  if (textMap is Map<String, dynamic>) {
+                    pageTexts.add(DraggableText.fromMap(
+                        textMap, onSelected, updatePosition));
+                  }
+                }
+                _pages.add(pageTexts);
+                _undoStack.add([]);
+                _redoStack.add([]);
+              }
+            }
+          } else {
+            print("Invalid data format for 'pages': $jsonData['pages']");
+          }
+
+          print("Data loaded successfully!");
+        } else {
+          print("Invalid or missing 'data' field in document.");
         }
-
-        // Deserialize undoStack
-        for (var undo in data['undoStack']) {
-          List<List<DraggableText>> undoPages = undo
-              .map<List<DraggableText>>((page) =>
-                  page.map<DraggableText>((textMap) => DraggableText.fromMap(
-                      textMap, onSelected, updatePosition)).toList())
-              .toList();
-          _undoStack.add(undoPages);
-        }
-
-        // Deserialize redoStack
-        for (var redo in data['redoStack']) {
-          List<List<DraggableText>> redoPages = redo
-              .map<List<DraggableText>>((page) =>
-                  page.map<DraggableText>((textMap) => DraggableText.fromMap(
-                      textMap, onSelected, updatePosition)).toList())
-              .toList();
-          _redoStack.add(redoPages);
-        }
-
-        print("Data loaded successfully!");
       } else {
         print("No document found with ID: $documentId");
+
+        // Create empty data structure
+        Map<String, dynamic> newData = {
+          'pages': [],
+        };
+
+        // Convert the data map to a JSON string
+        String jsonData = jsonEncode({'data': newData});
+
         // Optionally create a new document if not found
         await firestore.collection('your_collection').doc(documentId).set({
-          'pages': [],
-          'undoStack': [],
-          'redoStack': [],
+          'data': jsonData, // Store the JSON string
         });
+
         print("New document created with ID: $documentId");
       }
     } catch (e) {
       print("Error loading data: $e");
     }
   }
-
 
   void _addText() {
     _saveStateToUndoStack();
@@ -187,38 +180,41 @@ List<List<DraggableText>> pages,
     showDialog(
       context: context,
       builder: (context) {
-      return AlertDialog(
-        backgroundColor: Colors.black,
-        title: const Text("Add Text", style: TextStyle(color: Colors.white)),
-        content: TextField(
-        controller: textController,
-        decoration: const InputDecoration(hintText: "Enter your text", hintStyle: TextStyle(color: Colors.white)),
-        style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: TextButton.styleFrom(
-            backgroundColor: Colors.black,
-            side: const BorderSide(color: Colors.white),
+        return AlertDialog(
+          backgroundColor: Colors.black,
+          title: const Text("Add Text", style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: textController,
+            decoration: const InputDecoration(
+                hintText: "Enter your text",
+                hintStyle: TextStyle(color: Colors.white)),
+            style: const TextStyle(color: Colors.white),
           ),
-          child: const Text("Cancel", style: TextStyle(color: Colors.white)),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            _addDraggableText(textController.text.isNotEmpty
-          ? textController.text
-          : 'Text $_textCounter');
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black,
-            side: const BorderSide(color: Colors.white),
-          ),
-          child: const Text("Add", style: TextStyle(color: Colors.white)),
-        ),
-        ],
-      );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.black,
+                side: const BorderSide(color: Colors.white),
+              ),
+              child:
+                  const Text("Cancel", style: TextStyle(color: Colors.white)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _addDraggableText(textController.text.isNotEmpty
+                    ? textController.text
+                    : 'Text $_textCounter');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                side: const BorderSide(color: Colors.white),
+              ),
+              child: const Text("Add", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
       },
     );
   }
@@ -237,13 +233,13 @@ List<List<DraggableText>> pages,
         isUnderline: _isUnderline,
         onSelected: _handleTextSelection,
         updatePosition: _updateTextPosition,
-        isSelected: false, 
+        isSelected: false,
       );
       _pages[_currentPage].add(newText);
       _textCounter++;
       _selectedText = newText;
     });
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
   void _handleTextSelection(DraggableText text) {
@@ -271,7 +267,7 @@ List<List<DraggableText>> pages,
         _pages[_currentPage][index] = text.copyWith(position: newPosition);
       }
     });
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
   void _updateSelectedTextStyle() {
@@ -291,7 +287,7 @@ List<List<DraggableText>> pages,
           _selectedText = _pages[_currentPage][index];
         }
       });
-      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+      _saveDataToFirestore('document_id', _pages);
     }
   }
 
@@ -322,7 +318,7 @@ List<List<DraggableText>> pages,
       },
     );
   }
-  
+
   void _showEditOptions() {
     setState(() {
       _selectedOption = 1;
@@ -348,27 +344,37 @@ List<List<DraggableText>> pages,
         ),
       ));
     });
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
-  void _reorderPages(List<List<DraggableText>> reorderedPages, List<Color> reorderedColors) {
+  void _reorderPages(
+      List<List<DraggableText>> reorderedPages, List<Color> reorderedColors) {
     setState(() {
       _pages.clear();
+      _undoStack.clear();
+      _redoStack.clear();
       _pages.addAll(reorderedPages);
+      _undoStack.addAll(List.generate(reorderedPages.length, (_) => []));
+      _redoStack.addAll(List.generate(reorderedPages.length, (_) => []));
       _backgroundColors.clear();
       _backgroundColors.addAll(reorderedColors);
     });
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
-  void _updatePages(List<List<DraggableText>> updatedPages, List<Color> updatedColors) {
+  void _updatePages(
+      List<List<DraggableText>> updatedPages, List<Color> updatedColors) {
     setState(() {
       _pages.clear();
+      _undoStack.clear();
+      _redoStack.clear();
       _pages.addAll(updatedPages);
+      _undoStack.addAll(List.generate(updatedPages.length, (_) => []));
+      _redoStack.addAll(List.generate(updatedPages.length, (_) => []));
       _backgroundColors.clear();
       _backgroundColors.addAll(updatedColors);
     });
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
   void _changeBackgroundColor() {
@@ -396,7 +402,7 @@ List<List<DraggableText>> pages,
         );
       },
     );
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
   void _deleteSelectedText() {
@@ -406,7 +412,7 @@ List<List<DraggableText>> pages,
         _pages[_currentPage].remove(_selectedText);
         _selectedText = null;
       });
-      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+      _saveDataToFirestore('document_id', _pages);
     }
   }
 
@@ -423,7 +429,7 @@ List<List<DraggableText>> pages,
         _pages[_currentPage].clear();
         _pages[_currentPage].addAll(_undoStack[_currentPage].removeLast());
       });
-      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+      _saveDataToFirestore('document_id', _pages);
     }
   }
 
@@ -434,7 +440,7 @@ List<List<DraggableText>> pages,
         _pages[_currentPage].clear();
         _pages[_currentPage].addAll(_redoStack[_currentPage].removeLast());
       });
-      _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+      _saveDataToFirestore('document_id', _pages);
     }
   }
 
@@ -470,10 +476,7 @@ List<List<DraggableText>> pages,
       _redoStack.add([]);
       _backgroundColors.add(Colors.white);
     });
-    print("Pages: $_pages");
-print("Undo Stack: $_undoStack");
-print("Redo Stack: $_redoStack");
-    _saveDataToFirestore('document_id', _pages, _undoStack, _redoStack);
+    _saveDataToFirestore('document_id', _pages);
   }
 
   @override
@@ -487,29 +490,31 @@ print("Redo Stack: $_redoStack");
             color: Colors.white,
           ),
         ),
-        actions: _selectedOption==1?[
-          IconButton(
-            onPressed: _undoAction,
-            icon: const Icon(
-              Icons.undo,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            onPressed: _redoAction,
-            icon: const Icon(
-              Icons.redo,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            onPressed: _deleteSelectedText,
-            icon: const Icon(
-              Icons.delete,
-              color: Colors.white,
-            ),
-          ),
-        ]:null,
+        actions: _selectedOption == 1
+            ? [
+                IconButton(
+                  onPressed: _undoAction,
+                  icon: const Icon(
+                    Icons.undo,
+                    color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  onPressed: _redoAction,
+                  icon: const Icon(
+                    Icons.redo,
+                    color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  onPressed: _deleteSelectedText,
+                  icon: const Icon(
+                    Icons.delete,
+                    color: Colors.white,
+                  ),
+                ),
+              ]
+            : null,
         backgroundColor: Colors.black,
       ),
       body: SafeArea(
@@ -520,95 +525,102 @@ print("Redo Stack: $_redoStack");
                 controller: _pageController,
                 itemCount: _pages.length,
                 itemBuilder: (context, index) {
-                return Stack(
-                  children: [
-                  Center(
-                    child: AspectRatio(aspectRatio: 9 / 16,
-                    child: Container(color: _backgroundColors[index])),
-                  ),
-                  ..._pages[index],
-                  ],
-                );
+                  return Stack(
+                    children: [
+                      Center(
+                        child: AspectRatio(
+                            aspectRatio: 9 / 16,
+                            child: Container(color: _backgroundColors[index])),
+                      ),
+                      ..._pages[index],
+                    ],
+                  );
                 },
               ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _previousPage,
-                color: _currentPage > 0?Colors.white:Colors.white.withOpacity(0.5),
-              ),
-              Row(
-                children: List<Widget>.generate(
-                _pages.length,
-                (index) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                  width: 8.0,
-                  height: 8.0,
-                  decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _currentPage == index
-                    ? Colors.white
-                    : Colors.white.withOpacity(0.5),
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _previousPage,
+                  color: _currentPage > 0
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.5),
+                ),
+                Row(
+                  children: List<Widget>.generate(
+                    _pages.length,
+                    (index) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                      width: 8.0,
+                      height: 8.0,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _currentPage == index
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.5),
+                      ),
+                    ),
                   ),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: _nextPage,
+                  color: _currentPage < _pages.length - 1
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.5),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.arrow_forward),
-                onPressed: _nextPage,
-                color:_currentPage < _pages.length - 1? Colors.white:Colors.white.withOpacity(0.5),
-              ),
               ],
             ),
             _selectedOption == 1
-              ? EditOptions(
-                fontSize: _fontSize,
-                fontFamily: _fontFamily,
-                isBold: _isBold,
-                isItalic: _isItalic,
-                isUnderline: _isUnderline,
-                fontColor: _fontColor,
-                backgroundColor: _backgroundColors[_currentPage],
-                onFontSizeChanged: (value) {
-                  setState(() {
-                  _fontSize = value;
-                  _updateSelectedTextStyle();
-                  });
-                },
-                onFontFamilyChanged: (value) {
-                  setState(() {
-                  _fontFamily = value;
-                  _updateSelectedTextStyle();
-                  });
-                },
-                onBoldChanged: (value) {
-                  setState(() {
-                  _isBold = value;
-                  _updateSelectedTextStyle();
-                  });
-                },
-                onItalicChanged: (value) {
-                  setState(() {
-                  _isItalic = value;
-                  _updateSelectedTextStyle();
-                  });
-                },
-                onUnderlineChanged: (value) {
-                  setState(() {
-                  _isUnderline = value;
-                  _updateSelectedTextStyle();
-                  });
-                },
-                onChangeFontColor: _changeFontColor,
-                onChangeBackgroundColor: _changeBackgroundColor,
-                onAddText: _addText,
-                onSelectedState:_showMainOptions,
-                
-                )
-              : Options(onEditOptions: _showEditOptions,onEditOrder: _showPageOrderOptions,),
+                ? EditOptions(
+                    fontSize: _fontSize,
+                    fontFamily: _fontFamily,
+                    isBold: _isBold,
+                    isItalic: _isItalic,
+                    isUnderline: _isUnderline,
+                    fontColor: _fontColor,
+                    backgroundColor: _backgroundColors[_currentPage],
+                    onFontSizeChanged: (value) {
+                      setState(() {
+                        _fontSize = value;
+                        _updateSelectedTextStyle();
+                      });
+                    },
+                    onFontFamilyChanged: (value) {
+                      setState(() {
+                        _fontFamily = value;
+                        _updateSelectedTextStyle();
+                      });
+                    },
+                    onBoldChanged: (value) {
+                      setState(() {
+                        _isBold = value;
+                        _updateSelectedTextStyle();
+                      });
+                    },
+                    onItalicChanged: (value) {
+                      setState(() {
+                        _isItalic = value;
+                        _updateSelectedTextStyle();
+                      });
+                    },
+                    onUnderlineChanged: (value) {
+                      setState(() {
+                        _isUnderline = value;
+                        _updateSelectedTextStyle();
+                      });
+                    },
+                    onChangeFontColor: _changeFontColor,
+                    onChangeBackgroundColor: _changeBackgroundColor,
+                    onAddText: _addText,
+                    onSelectedState: _showMainOptions,
+                  )
+                : Options(
+                    onEditOptions: _showEditOptions,
+                    onEditOrder: _showPageOrderOptions,
+                  ),
           ],
         ),
       ),
