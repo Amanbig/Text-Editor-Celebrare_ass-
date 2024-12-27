@@ -4,9 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:text_editor/components/draggable_text.dart';
+
 import 'package:text_editor/components/edit_options.dart';
+import 'package:text_editor/components/loader.dart';
 import 'package:text_editor/screens/edit_order.dart';
 import 'package:text_editor/components/options.dart';
+extension ColorExtension on Color {
+  String toHex() => value.toRadixString(16).padLeft(8, '0');
+}
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -16,17 +21,16 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+
+  bool _isLoading = true;
+
   String _fontFamily = 'Arial';
   bool _isBold = false;
   bool _isItalic = false;
   bool _isUnderline = false;
   double _fontSize = 16.0;
   Color _fontColor = Colors.black;
-  final List<Color> _backgroundColors = [
-    Colors.white,
-    Colors.white,
-    Colors.white
-  ];
+  final List<Color> _backgroundColors = [];
   int _selectedOption = 0;
 
   final PageController _pageController = PageController();
@@ -41,12 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _loadDataFromFirestore(
-      'document_id',
-      _handleTextSelection,
-      _updateTextPosition,
-    );
-    setState(() {});
+    _initializeApp();
     _pageController.addListener(() {
       setState(() {
         _currentPage = _pageController.page!.round();
@@ -54,120 +53,92 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<void> _initializeApp() async {
+    await _loadDataFromFirestore(
+      'document_id',
+      _handleTextSelection,
+      _updateTextPosition,
+    );
+    setState(() {
+      _isLoading = false; // Update loading state
+    });
+  }
+
   Future<void> _saveDataToFirestore(
-      String documentId,
-      List<List<DraggableText>> pages,
-    ) async {
+      String documentId, List<List<DraggableText>> pages, List<Color> backgroundColors) async {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // Flatten the pages into a list of maps
-      List<List<Map<String, dynamic>>> serializedPages = pages
+      // Serialize pages and colors
+      final serializedPages = pages
           .map((page) => page.map((text) => text.toMap()).toList())
           .toList();
+      final serializedColors =
+          backgroundColors.map((color) => color.toHex()).toList();
 
-      // Create a map to hold all data
-      Map<String, dynamic> data = {
+      final data = {
         'pages': serializedPages,
+        'backgroundColors': serializedColors,
       };
 
-      // Convert the data map to a JSON string
-      String jsonData = jsonEncode(data);
-
-      // Reference to the document
-      DocumentReference docRef =
-          firestore.collection('your_collection').doc(documentId);
-
-      // Check if the document exists
-      DocumentSnapshot docSnapshot = await docRef.get();
+      final docRef = firestore.collection('your_collection').doc(documentId);
+      final docSnapshot = await docRef.get();
 
       if (docSnapshot.exists) {
-        // Document exists, update it
-        await docRef.update({
-          'data': jsonData,
-        });
-        print("Data updated successfully!");
+        await docRef.update({'data': jsonEncode(data)});
       } else {
-        // Document does not exist, create it
-        await docRef.set({
-          'data': jsonData,
-        });
-        print("Data saved successfully!");
+        await docRef.set({'data': jsonEncode(data)});
       }
     } catch (e) {
-      print("Error updating data: $e");
+      debugPrint("Error saving data: $e");
     }
   }
+
 
   Future<void> _loadDataFromFirestore(
-      String documentId,
-      Function(DraggableText) onSelected,
-      Function(DraggableText, Offset) updatePosition) async {
+      String documentId, Function(DraggableText) onSelected, Function(DraggableText, Offset) updatePosition) async {
     try {
       final firestore = FirebaseFirestore.instance;
-
-      DocumentSnapshot snapshot =
-          await firestore.collection('your_collection').doc(documentId).get();
+      final snapshot = await firestore.collection('your_collection').doc(documentId).get();
 
       if (snapshot.exists) {
-        final data = snapshot.data() as Map<String, dynamic>;
-
-        // Check if the 'data' field is a string (as it contains the JSON string)
-        if (data['data'] is String) {
-          // Decode the JSON string into a Map
+        final data = snapshot.data();
+        if (data != null && data['data'] is String) {
           final jsonData = jsonDecode(data['data']) as Map<String, dynamic>;
 
-          _pages.clear();
-          _undoStack.clear();
-          _redoStack.clear();
+          setState(() {
+            _pages.clear();
+            _backgroundColors.clear();
 
-          // Deserialize pages (ensure pages is a List)
-          if (jsonData['pages'] is List) {
-            List pagesData = jsonData['pages'];
-            for (var page in pagesData) {
-              if (page is List) {
-                List<DraggableText> pageTexts = [];
-                for (var textMap in page) {
-                  if (textMap is Map<String, dynamic>) {
-                    pageTexts.add(DraggableText.fromMap(
-                        textMap, onSelected, updatePosition));
-                  }
+            // Deserialize pages
+            if (jsonData['pages'] is List) {
+              for (final page in jsonData['pages']) {
+                if (page is List) {
+                  final pageTexts = page
+                      .map((textMap) =>
+                          DraggableText.fromMap(textMap, onSelected, updatePosition))
+                      .toList();
+                  _pages.add(pageTexts);
+                  _undoStack.add([]);
+                  _redoStack.add([]);
                 }
-                _pages.add(pageTexts);
-                _undoStack.add([]);
-                _redoStack.add([]);
               }
             }
-          } else {
-            print("Invalid data format for 'pages': $jsonData['pages']");
-          }
 
-          print("Data loaded successfully!");
-        } else {
-          print("Invalid or missing 'data' field in document.");
+            // Deserialize background colors
+            if (jsonData['backgroundColors'] is List) {
+              for (final colorHex in jsonData['backgroundColors']) {
+                _backgroundColors.add(Color(int.parse(colorHex, radix: 16)));
+              }
+            }
+          });
         }
-      } else {
-        print("No document found with ID: $documentId");
-
-        // Create empty data structure
-        Map<String, dynamic> newData = {
-          'pages': [],
-        };
-
-        // Convert the data map to a JSON string
-        String jsonData = jsonEncode({'data': newData});
-
-        // Optionally create a new document if not found
-        await firestore.collection('your_collection').doc(documentId).set({
-          'data': jsonData, // Store the JSON string
-        });
-
-        print("New document created with ID: $documentId");
       }
     } catch (e) {
-      print("Error loading data: $e");
+      debugPrint("Error loading data: $e");
     }
   }
+
 
   void _addText() {
     _saveStateToUndoStack();
@@ -239,7 +210,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _textCounter++;
       _selectedText = newText;
     });
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
   void _handleTextSelection(DraggableText text) {
@@ -267,7 +238,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage][index] = text.copyWith(position: newPosition);
       }
     });
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
   void _updateSelectedTextStyle() {
@@ -287,7 +258,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _selectedText = _pages[_currentPage][index];
         }
       });
-      _saveDataToFirestore('document_id', _pages);
+      _saveDataToFirestore('document_id', _pages, _backgroundColors);
     }
   }
 
@@ -298,14 +269,16 @@ class _MyHomePageState extends State<MyHomePage> {
         return AlertDialog(
           title: const Text("Choose Font Color"),
           content: SingleChildScrollView(
-            child: BlockPicker(
+            child: ColorPicker(
               pickerColor: _fontColor,
               onColorChanged: (color) {
-                setState(() {
-                  _fontColor = color;
-                  _updateSelectedTextStyle();
-                });
+              setState(() {
+                _fontColor = color;
+                _updateSelectedTextStyle();
+              });
               },
+              labelTypes: [],
+              pickerAreaHeightPercent: 0.8,
             ),
           ),
           actions: [
@@ -344,7 +317,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ));
     });
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
   void _reorderPages(
@@ -359,22 +332,17 @@ class _MyHomePageState extends State<MyHomePage> {
       _backgroundColors.clear();
       _backgroundColors.addAll(reorderedColors);
     });
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
-  void _updatePages(
-      List<List<DraggableText>> updatedPages, List<Color> updatedColors) {
+  void _updatePages(List<List<DraggableText>> updatedPages, List<Color> updatedColors) {
     setState(() {
       _pages.clear();
-      _undoStack.clear();
-      _redoStack.clear();
-      _pages.addAll(updatedPages);
-      _undoStack.addAll(List.generate(updatedPages.length, (_) => []));
-      _redoStack.addAll(List.generate(updatedPages.length, (_) => []));
       _backgroundColors.clear();
+      _pages.addAll(updatedPages);
       _backgroundColors.addAll(updatedColors);
     });
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
   void _changeBackgroundColor() {
@@ -384,13 +352,15 @@ class _MyHomePageState extends State<MyHomePage> {
         return AlertDialog(
           title: const Text("Choose Background Color"),
           content: SingleChildScrollView(
-            child: BlockPicker(
+            child: ColorPicker(
               pickerColor: _backgroundColors[_currentPage],
               onColorChanged: (color) {
-                setState(() {
-                  _backgroundColors[_currentPage] = color;
-                });
+              setState(() {
+                _backgroundColors[_currentPage] = color;
+              });
               },
+              showLabel: true,
+              pickerAreaHeightPercent: 0.8,
             ),
           ),
           actions: [
@@ -402,7 +372,7 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       },
     );
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
   void _deleteSelectedText() {
@@ -412,7 +382,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage].remove(_selectedText);
         _selectedText = null;
       });
-      _saveDataToFirestore('document_id', _pages);
+      _saveDataToFirestore('document_id', _pages, _backgroundColors);
     }
   }
 
@@ -429,7 +399,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage].clear();
         _pages[_currentPage].addAll(_undoStack[_currentPage].removeLast());
       });
-      _saveDataToFirestore('document_id', _pages);
+      _saveDataToFirestore('document_id', _pages, _backgroundColors);
     }
   }
 
@@ -440,7 +410,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _pages[_currentPage].clear();
         _pages[_currentPage].addAll(_redoStack[_currentPage].removeLast());
       });
-      _saveDataToFirestore('document_id', _pages);
+      _saveDataToFirestore('document_id', _pages, _backgroundColors);
     }
   }
 
@@ -476,7 +446,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _redoStack.add([]);
       _backgroundColors.add(Colors.white);
     });
-    _saveDataToFirestore('document_id', _pages);
+    _saveDataToFirestore('document_id', _pages, _backgroundColors);
   }
 
   @override
@@ -518,7 +488,8 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Colors.black,
       ),
       body: SafeArea(
-        child: Column(
+        child:_isLoading? LoadingIndicator()
+        : Column(
           children: [
             Expanded(
               child: PageView.builder(
@@ -546,7 +517,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   onPressed: _previousPage,
                   color: _currentPage > 0
                       ? Colors.white
-                      : Colors.white.withOpacity(0.5),
+                      : Colors.grey,
                 ),
                 Row(
                   children: List<Widget>.generate(
