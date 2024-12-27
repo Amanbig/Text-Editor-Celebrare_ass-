@@ -2,6 +2,8 @@
 
 A Flutter project for creating a draggable text editor with customizable font styles and colors.
 
+[![Demo Video](https://github.com/Amanbig/Text-Editor-Celebrare_ass-/blob/main/public/app_working1.mp4)]
+
 ## Getting Started
 
 This project is a starting point for a Flutter application. Below are the steps to get this project up and running on your local machine.
